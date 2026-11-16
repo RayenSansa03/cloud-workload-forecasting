@@ -7,16 +7,16 @@ Built for the Atomity AI/ML take-home challenge, on the `data-v1` subset of the 
 
 ## Results at a glance
 
-| Target | Model | Validation MAE (7 folds) | Holdout MAE | Persistence holdout MAE |
-|---|---|---|---|---|
-| `aggregate_cpu_utilization` | Ridge autoregression, 3 lags | 0.198 | 0.098 | 0.147 |
-| `active_vm_count` | Persistence | 0 | 0 | 0 |
+| Target                      | Model                        | Validation MAE (7 folds) | Holdout MAE | Persistence holdout MAE |
+| --------------------------- | ---------------------------- | ------------------------ | ----------- | ----------------------- |
+| `aggregate_cpu_utilization` | Ridge autoregression, 3 lags | 0.198                    | 0.098       | 0.147                   |
+| `active_vm_count`           | Persistence                  | 0                        | 0           | 0                       |
 
 - The ridge model has 25% lower error than persistence in validation, and 33% lower on the holdout.
   It wins on 4 of 7 validation folds, so the gain is real but not uniform.
 - `active_vm_count` is constant (10,000) because the dataset keeps only VMs with a complete trace.
-- Capacity rule: plan for forecast + 0.20 CPU points, and raise the headroom to +0.45 points
-  when the P95 of `max_cpu` across VMs goes above 70.2%.
+- Capacity rule (indicative, on the aggregate CPU indicator): forecast + 0.20 points,
+  raised to +0.45 points when the P95 of max_cpu across VMs goes above 70.2%.
 
 The full analysis is in [`reports/final_report.md`](reports/final_report.md).
 

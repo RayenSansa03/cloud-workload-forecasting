@@ -17,9 +17,10 @@ and what should an infrastructure team do with the forecast?
   (0.098 vs 0.147). The gain is real but not uniform: the model wins on 4 of 7 validation folds.
 - The model mainly works because it pulls the forecast back toward the recent mean. It does not predict
   short spikes, and it would follow a lasting level change late.
-- **Recommendation:** plan for forecast + 0.20 CPU points (about 2% of the load) in normal mode,
-  and raise the headroom to +0.45 points when the P95 of `max_cpu` across VMs goes above 70.2%.
-  On the holdout, the normal plan covered 23 of 24 steps.
+- **Recommendation:** an indicative headroom policy on the aggregate CPU indicator: forecast + 0.20 points
+  in normal mode, raised to +0.45 points when the P95 of `max_cpu` across VMs goes above 70.2%.
+  On the holdout, the normal plan covered 23 of 24 steps. The indicator is an unweighted mean of VM percentages,
+  so this is a monitoring and scaling signal, not a direct vCPU sizing rule (section 8).
 
 ## 2. Data understanding
 
@@ -183,6 +184,11 @@ so the denominator is safe; the metric also has a small epsilon guard. For the c
 **forecast + headroom**, where the headroom is a percentile of the model's under-forecast errors in validation.
 The holdout is only used to check the plan.
 
+**Scope of the rule:** the target is the unweighted mean of VM-level CPU percentages, so a 2-vCPU VM and a
+32-vCPU VM count the same. The headroom is therefore an indicative policy on this fleet indicator: a signal to
+scale up or to look closer, not a number of vCPUs to provision. Real sizing needs a core-weighted demand
+(CPU % x vCPUs of each VM). The metadata only gives coarse core buckets (for example ">24"), so I did not build it.
+
 **Cost assumption:** running short of capacity costs 5 times more than idle capacity (slowdowns and unhappy
 customers vs paying for unused resources). With this ratio, the best coverage in theory is
 5 / (5 + 1) = 83% (the newsvendor rule), which points to the 80th percentile.
@@ -207,8 +213,8 @@ it is a fast detector, not a predictor.
 
 **Policy:**
 
-1. **Normal mode:** plan aggregate CPU = forecast + 0.20 points (q80). On the holdout this covered 23 of 24 steps
-   with about 2% extra capacity; the only miss is the 9.64% spike.
+1. **Normal mode:** headroom on the aggregate CPU indicator = forecast + 0.20 points (q80). On the holdout this covered
+   23 of 24 steps, about 2% above the forecast value; the only miss is the 9.64% spike.
 2. **Peak mode:** when the P95 of `max_cpu` goes above 70.2%, raise the headroom to +0.45 points (q95)
    until it falls back below the level.
 3. **VM count:** plan for the current count, and check this rule on data with real churn.
@@ -224,8 +230,8 @@ A team with stricter latency targets should use q90 (+0.40 points).
 - **No churn:** the dataset keeps only complete traces, so the VM count is constant and its forecast says nothing
   about real fleets, where VMs are created and deleted.
 - **Small holdout:** one 2-hour window with a single peak point. The validation folds are the more reliable evidence.
-- **Fleet average only:** the targets average 10,000 VMs. Real scaling decisions happen per service or per VM,
-  where the load is much more uneven.
+- **Fleet average only:** the CPU target is an unweighted mean over 10,000 VMs of very different sizes.
+  Real scaling decisions need core-weighted demand, per service or per VM, where the load is much more uneven.
 - **Assumed cost ratio:** the 5:1 ratio should come from the infrastructure team (contract penalties, machine prices).
 - **Next steps:** forecast per VM category and sum the results, add prediction intervals,
   and test the approach on a longer trace with churn.
