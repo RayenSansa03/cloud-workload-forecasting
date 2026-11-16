@@ -14,9 +14,10 @@ and what should an infrastructure team do with the forecast?
   keeps only VMs with a complete trace.
 - A simple ridge autoregression on the last 3 values beats the persistence baseline:
   **25% lower MAE in rolling-origin validation** (0.198 vs 0.266 points) and **33% lower on the holdout**
-  (0.098 vs 0.147). The gain is real but not uniform: the model wins on 4 of 7 validation folds.
-- The model mainly works because it pulls the forecast back toward the recent mean. It does not predict
-  short spikes, and it would follow a lasting level change late.
+  (0.098 vs 0.147). The gain is real but not uniform: the model wins on 4 of 7 validation folds,
+  and it is weaker than persistence during peaks, where it under-forecasts.
+- The model mainly works because it pulls the forecast back toward the recent mean. This helps in normal periods,
+  but not during peaks: it does not predict spikes, and it follows a lasting level change late.
 - **Recommendation:** an indicative headroom policy on the aggregate CPU indicator: forecast + 0.20 points
   in normal mode, raised to +0.45 points when the P95 of `max_cpu` across VMs goes above 70.2%.
   On the holdout, the normal plan covered 23 of 24 steps. The indicator is an unweighted mean of VM percentages,
@@ -101,6 +102,8 @@ Candidates (all in `src/cwfc/models.py`):
   The penalty keeps the model small and pulls forecasts toward the mean when the lags carry little signal.
 
 I kept the list short on purpose: with 110 points, testing many settings would end up selecting a lucky model.
+The result is not sensitive to the penalty: for alpha from 0.1 to 100, the validation MAE stays between 0.195
+and 0.201, so I keep alpha = 1.
 Deep models (LSTM, Transformer) would overfit this little data.
 
 **VM count:** every candidate gives zero error on a constant series, so I use persistence, the simplest one.
@@ -164,9 +167,18 @@ After that, persistence error keeps growing (up to about 0.42 points), while the
 **Bias (holdout).** Persistence under-forecasts on 79% of steps (mean error -0.10 points): used for capacity,
 it would under-provision most of the time. The ridge model is almost unbiased (+0.03) and under-forecasts on 38% of steps.
 
-**Peaks.** Only 1 of 24 holdout timestamps is above the peak threshold (the 75th percentile of training CPU, 9.51%).
-On that point the model error is 0.31 vs 0.47 for persistence. One point is not enough to judge peak behaviour;
-the validation folds, which cover the bump, are the better evidence.
+**Peaks (validation).** Peak points are those at or above the 75th percentile of training CPU (9.51%):
+63 of the 168 validation points.
+
+| Model          | Peak MAE  | Peak bias | Off-peak MAE | Off-peak bias |
+| -------------- | --------- | --------- | ------------ | ------------- |
+| ridge_ar_lags3 | 0.239     | -0.218    | **0.174**    | +0.170        |
+| persistence    | **0.213** | -0.063    | 0.297        | +0.291        |
+
+On peaks, the ridge model is worse than persistence and under-forecasts by 0.22 points on average (bias =
+forecast - actual), because it pulls the forecast back toward the mean while the load is high. Off-peak it is
+much better. **The overall gain comes from normal periods, not from peaks.** On the holdout, only 1 of 24 points
+is above the threshold (model error 0.31 vs 0.47 for persistence), so it says little about peaks.
 
 **Failure modes.**
 
@@ -205,6 +217,9 @@ customers vs paying for unused resources). With this ratio, the best coverage in
 
 q50 has the lowest cost on this holdout, but only because the holdout is calm, and it leaves the plan short on
 more than a third of the steps. I do not pick the headroom from holdout results.
+
+**Why a peak mode is needed:** in validation, the model under-forecasts peaks by 0.22 points on average, more than
+the normal headroom (+0.20). During peaks, the forecast plus the normal headroom is not enough.
 
 **Peak trigger:** the average hides peaks, but the P95 of `max_cpu` across VMs shows them. The trigger level is
 the 90th percentile of that signal in training: 70.2%. It fired on 11 training timestamps, all during the main
