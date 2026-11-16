@@ -15,10 +15,12 @@ Built for the Atomity AI/ML take-home challenge, on the `data-v1` subset of the 
 - The ridge model has 25% lower error than persistence in validation, and 33% lower on the holdout.
   It wins on 4 of 7 validation folds, so the gain is real but not uniform.
 - `active_vm_count` is constant (10,000) because the dataset keeps only VMs with a complete trace.
+- On peak periods the ridge model is weaker than persistence (validation MAE 0.239 vs 0.213) and under-forecasts,
+  so the overall gain comes from normal periods.
 - Capacity rule (indicative, on the aggregate CPU indicator): forecast + 0.20 points,
-  raised to +0.45 points when the P95 of max_cpu across VMs goes above 70.2%.
+  raised to +0.45 points when the P95 of `max_cpu` across VMs goes above 70.2%.
 
-The full analysis is in [`reports/final_report.md`](reports/final_report.md).
+**Full report: [reports/final_report.pdf](reports/final_report.pdf)** (also in [Markdown](reports/final_report.md)).
 
 ## Repository structure
 
@@ -38,7 +40,9 @@ notebooks/
   03_holdout_evaluation.ipynb   final score on the holdout and error analysis
   04_capacity.ipynb             capacity recommendation
 tests/                          unit tests (pytest)
-reports/final_report.md         final report
+reports/final_report.pdf        final report (PDF)
+reports/final_report.md         final report (Markdown source)
+reports/figures/                figures used in the report
 predictions.csv                 holdout predictions
 ```
 
@@ -77,7 +81,8 @@ python -m cwfc.pipeline --data challenge_data --output predictions.csv
 Options: `--data` (folder with `vm_cpu_readings.csv.gz`), `--output` (CSV path), `--holdout-size` (default 24).
 The command checks the output against the submission contract before writing it.
 It only needs `vm_cpu_readings.csv.gz`, and it works on any dataset with the same columns.
-The data must contain more timestamps than --holdout-size (default 24).
+The data must contain more timestamps than `--holdout-size` (default 24).
+
 Tests:
 
 ```bash
@@ -112,6 +117,7 @@ Notebooks: run them in order, from the project root or from `notebooks/`.
 
 ## Use of AI tools
 
-I used Claude (chat assistant) for guidance, code suggestions and review.
-It had no access to my repository: I wrote and ran every step myself, checked the results,
-and made the analysis and modelling choices.
+I used Claude (chat assistant) to guide the work step by step, write code suggestions and draft the report text.
+It had no access to my repository. I ran every step myself, checked each result in the notebooks,
+reviewed and validated every modelling choice, and committed the work.
+I also asked another AI assistant to review the repository before submission.
