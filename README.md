@@ -77,7 +77,7 @@ python -m cwfc.pipeline --data challenge_data --output predictions.csv
 Options: `--data` (folder with `vm_cpu_readings.csv.gz`), `--output` (CSV path), `--holdout-size` (default 24).
 The command checks the output against the submission contract before writing it.
 It only needs `vm_cpu_readings.csv.gz`, and it works on any dataset with the same columns.
-
+The data must contain more timestamps than --holdout-size (default 24).
 Tests:
 
 ```bash
